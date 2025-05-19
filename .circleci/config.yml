@@ -16,78 +16,78 @@ jobs:
           paths:
             - .
   
-    etl:
-      docker:
-        - image: cimg/python:3.10
-      steps:
-        - attach_workspace:
-            at: ./
-        - run:
-            name: Install dependencies
-            command: |
-              python -m pip install --upgrade pip
-              pip install -r requirements.txt
-        - run:
-            name: Extract Data
-            command: python etl.py extract_data
-        - run:
-            name: Transform Data
-            command: python etl.py transform_data
-        - run:
-            name: Validate Data
-            command: python etl.py validate_data
-        - run:
-            name: Load Data
-            command: python etl.py load_data
-        - persist_to_workspace:
-            root: .
-            paths:
-              - .
-              
-        - run:
-            name: Verify file exists
-            command: |
-              ls -l data
-              cat data/crypto.md
-        - store_artifacts:
-            path: data/crypto.md
-            destination: output-data
+  etl:
+    docker:
+      - image: cimg/python:3.10
+    steps:
+      - attach_workspace:
+          at: ./
+      - run:
+          name: Install dependencies
+          command: |
+            python -m pip install --upgrade pip
+            pip install -r requirements.txt
+      - run:
+          name: Extract Data
+          command: python etl.py extract_data
+      - run:
+          name: Transform Data
+          command: python etl.py transform_data
+      - run:
+          name: Validate Data
+          command: python etl.py validate_data
+      - run:
+          name: Load Data
+          command: python etl.py load_data
+      - persist_to_workspace:
+          root: .
+          paths:
+            - .
+            
+      - run:
+          name: Verify file exists
+          command: |
+            ls -l data
+            cat data/crypto.md
+      - store_artifacts:
+          path: data/crypto.md
+          destination: output-data
 
-    upload:
-      executor: aws-cli/default
-      steps:
-        - attach_workspace:
-            at: .
-        - aws-cli/setup:
-            profile_name: OIDC-User
-            role_arn: arn:aws:iam::${AWS_ACCOUNT_ID}:role/circleci-role
-            region: ${AWS_REGION}
-        - run:
-            name: Prepare S3
-            command: |
-              # Create the S3 bucket
-              echo "Creating S3 bucket: ${S3_BUCKET}..."
-              aws s3api create-bucket \
-                --bucket "${S3_BUCKET}" \
-                --region "${AWS_REGION}" \
-                --no-cli-pager
-              echo "Bucket created: ${S3_BUCKET}"
-              # Configure public access block
-              aws s3api put-public-access-block \
-                --bucket "${S3_BUCKET}" \
-                --public-access-block-configuration BlockPublicAcls=false,IgnorePublicAcls=false,BlockPublicPolicy=false,RestrictPublicBuckets=false \
-                --no-cli-pager
-              # Set ownership controls
-              aws s3api put-bucket-ownership-controls \
-                --bucket "${S3_BUCKET}" \
-                --ownership-controls 'Rules=[{ObjectOwnership=BucketOwnerPreferred}]' \
-                --no-cli-pager
-              echo "Bucket public access and ownership controls configured."
-        - aws-s3/copy:
-            from: data/crypto.md
-            to: s3://${S3_BUCKET}/crypto.md
-            arguments: |
-              --acl public-read
+  upload:
+    executor: aws-cli/default
+    steps:
+      - attach_workspace:
+          at: .
+      - aws-cli/setup:
+          profile_name: OIDC-User
+          role_arn: arn:aws:iam::${AWS_ACCOUNT_ID}:role/circleci-role
+          region: ${AWS_REGION}
+      - run:
+          name: Prepare S3
+          command: |
+            # Create the S3 bucket
+            echo "Creating S3 bucket: ${S3_BUCKET}..."
+            aws s3api create-bucket \
+              --bucket "${S3_BUCKET}" \
+              --region "${AWS_REGION}" \
+              --no-cli-pager
+            echo "Bucket created: ${S3_BUCKET}"
+            # Configure public access block
+            aws s3api put-public-access-block \
+              --bucket "${S3_BUCKET}" \
+              --public-access-block-configuration BlockPublicAcls=false,IgnorePublicAcls=false,BlockPublicPolicy=false,RestrictPublicBuckets=false \
+              --no-cli-pager
+            # Set ownership controls
+            aws s3api put-bucket-ownership-controls \
+              --bucket "${S3_BUCKET}" \
+              --ownership-controls 'Rules=[{ObjectOwnership=BucketOwnerPreferred}]' \
+              --no-cli-pager
+            echo "Bucket public access and ownership controls configured."
+      - aws-s3/copy:
+          from: data/crypto.md
+          to: s3://${S3_BUCKET}/crypto.md
+          arguments: |
+            --acl public-read
 
 workflows:
   ci-cd:
